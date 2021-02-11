@@ -1,0 +1,691 @@
+---
+title: "fpp3 hyndman"
+subtitle: "Hyndman, R.J., & Athanasopoulos, G. (2021) Forecasting: principles and practice, 3rd edition, OTexts: Melbourne, Australia. OTexts.com/fpp3. Accessed on February 9 2021"
+output: 
+  html_document: 
+    df_print: default
+    number_sections: yes
+    toc: yes
+---
+
+*Tell us what the future holds, so we may know that you are gods.
+(Isaiah 41:23)*
+
+
+```{r, include=FALSE, }
+#install.packages("fpp3") 
+#installing fpp3
+library(fpp3)
+library(tidyverse)
+library(knitr)
+library(USgas)
+library(readxl)
+library(Rfast)
+library(GGally)
+library(slider)
+library(lubridate)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(autodep = TRUE)
+```
+
+
+#1: Getting Started
+------------------------------------------------------------
+
+Basic premise of any forecasting:
+I need to know what the future holds w/ a given degree of confidence;
+I therefore apply the selected model to give a range within which the forecast should lie
+
+*   Start with GRAPHICS
+*   Then DECOMPOSE into groups to see patterns
+*   FEATURES can be extracted from the data
+*   SELECT model and apply model for forecast
+
+Hyndman breaks down forecasting into 3 tasks: Forecasting, Goals and Planning
+He also outlines there are Short-term, Medium-term and Long-term forecasts
+
+Quantitative forecasting (as opposed to Qualitative) requires numerical information about the past & a reasonable assumption about autocorrelation
+
+There are 3 general types of models presented
+
+*   Explanatory model -> Y = f(fundamental predictors, $\epsilon$)
+*   Time-series model -> Y = f($Y_t$, $Y_{t-1}$, $Y_{t-2}$, $\epsilon$)
+*   Mixed model -> Y = f($Y_t$, fundamental predictors, $\epsilon$)
+
+Exercises:
+
+1.  
+    * Case 3 possible predictors : previous appraisal value, average vehicle depreciation by model and year, data on possible malfunction, replaced parts, accidents on the vehicles (will affect re-sale value), on demand-side - need to estimate demand for vehicles, and previous values as well
+    * Case 4 possible predictors : shocks, factors affecting demand for 3 passenger classes, competition, major events that lead to travel
+    
+2.  Five steps of forecasting: too verbose to answer on here
+
+Looking forward to `code`
+
+#2: Time series graphics
+------------------------------------------------------------
+
+### `tsibble` objects
+
+```{r}
+y <- tsibble(
+  Year = 2015:2019,
+  Observation = c(123, 39, 78, 52, 110),
+  index = Year)
+head(y)
+#index can be specified other than Year, it can be month or day
+```
+
+Here is a table for how to use time class functions
+
+Frequency  | Functions
+------------- | -------------
+Annual  | `start:end`
+Quarterly  | `yearquarter()`
+Monthly  | `yearmonth()`
+Weekly  | `yearweek()`
+Daily  | `as_date(), ymd()`
+Sub-daily  | `as_datetime()`
+
+```{r}
+#this dataset is posted at 4yr intervals
+str(olympic_running)
+
+PBS %>%
+  filter(ATC2 == "A10") %>%
+  select(Month, Concession, Type, Cost) %>%
+  summarise(TotalC = sum(Cost)) %>%
+  mutate(Cost = TotalC / 1e6) -> a10
+
+#converting a csv into tsibble
+prison <- read_csv("https://OTexts.com/fpp3/extrafiles/prison_population.csv")
+prison <- prison %>% 
+  mutate(Quarter = yearquarter(Date)) %>% 
+  #select(-Date) %>% 
+  as_tsibble(
+    key = c(State, Gender, Legal, Indigenous),
+    index = Quarter)
+
+#contains 8 X 2 X 2 X 2 = 64 time series
+#64 X 48 Observations for quarters = 3072 rows
+prison
+```
+
+### Time plots
+
+plot t vs observed y
+
+```{r}
+#very messy ts data
+mel_syd_economy <- ansett %>% 
+  filter(Airports == "MEL-SYD", Class == "Economy")
+autoplot(mel_syd_economy, Passengers) +
+  labs(title = "Ansett economy class passengers",
+       subtitle = "Melbourne-Sydney")
+
+#ts with seasonality, strong trend
+autoplot(a10, Cost)
+  labs(y = "$million", title = "Antidiabetic drug sales")
+```
+
+Hyndman delimits 3 types of ts patterns:
+*   Trend - think of it as a greedy line
+*   Seasonal - a change occurs at fixed intervals (NOT recession!!)
+*   Cyclical - think recession, regime change for financial data
+
+### Seasonal plots
+
+Plot data grouped by seasons
+
+```{r}
+#this chart should make clear that january sales are strong in all years
+a10 %>% 
+  gg_season(Cost, label = "both") +
+  labs(y = "$ million",
+       title = "Seasonal plot : antidiabetic drug sales")
+
+#the following plot is garbage for now 
+#by day
+vic_elec %>% gg_season(Demand, period = "day") +
+  theme(legend.position = "none")
+
+#by week
+vic_elec %>% gg_season(Demand, period = "week") +
+  theme(legend.position = "none")
+
+#by year
+vic_elec %>% gg_season(Demand, period = "year") +
+  theme(legend.position = "right")
+
+```
+
+The strength of `gg_season` plots is that it can visualise possible features of the data
+
+*   Note that the original data `vic_elec` is intact and we have made heavy lifting possible
+
+### Seasonal subseries plots
+
+The main difference here compared to seasonal plots is that the data for each season are presented in split windows
+
+```{r}
+#note the blue line shows the mean for the given window
+a10 %>% 
+  gg_subseries(Cost) +
+  labs(
+    y = "$ million",
+    title = "Seasonal subseries plot: antidiabetic drug sales")
+```
+
+Hyndman is Australian, so we will see an example of australian vacation data
+
+```{r}
+holidays <- tourism %>% 
+  filter(Purpose == "Holiday") %>% 
+  group_by((State)) %>% 
+  summarise(Trips = sum(Trips))
+
+holidays
+
+#this plot shows strong but differing seasonality in btw groups
+autoplot(holidays, Trips) +
+  labs(y = "Trips, in thousands",
+       title = "Australian domestic holiday nights")
+
+gg_season(holidays, Trips) +
+  labs(y = "Trips, in thousands",
+       title = "Australian domestic holiday nights")
+
+#the South states are strongest in Q4, while the North states are strongest in Q3
+#Western Australia tourism has also jumped recently
+holidays %>% gg_subseries(Trips) +
+  labs(y = "Trips, in thousands",
+       title = "Australian domestic holiday nights")
+```
+
+### Scatterplots
+
+Visualising X-Y relationships
+
+```{r}
+#temperature levels and Demand levels covary strongly, it seems
+vic_elec %>% 
+  filter(year(Time) == 2014) %>% 
+  autoplot(Demand) +
+    labs(
+      y = "Demand (gW)",
+      title = "Half-hourly electricity demand: Victoria, Australia")
+
+vic_elec %>%
+  filter(year(Time) == 2014) %>%
+  autoplot(Temperature) +
+  labs(
+    y = "Temperature (degrees Celsius)",
+    title = "Half-hourly temperatures: Melbourne, Australia")
+
+vic_elec %>% 
+  filter(year(Time) == 2014) %>% 
+  ggplot(aes(x = Temperature, y = Demand)) +
+  geom_point() +
+    labs(y = "Demand (gW)", x = "Temperature (in degrees Celsius)")
+```
+
+Correlation: be aware that this captures the linear r/ship btw X and Y. That is, the temp = Demand r/ship gives `r` = 0.28, which undervalues the non-linear relationship
+
+Next, Hyman wants to plot correlations between tourism by state
+
+```{r}
+#facet_wrap is way better than facet_grid
+visitors <- tourism %>% 
+  group_by(State) %>% 
+  summarise(Trips = sum(Trips))
+visitors %>% 
+  ggplot(aes(x = Quarter, y = Trips)) +
+  geom_line() +
+  facet_wrap(vars(State), scales = "free_y") +
+    labs(y = "Number of visitor nights per quarter (in Millions)")
+
+visitors %>%
+  pivot_wider(values_from = Trips, names_from = State) %>%   
+  GGally::ggpairs(columns = 2:9)
+```
+
+### Lag plots
+
+```{r}
+recent_production <- aus_production %>% 
+  filter(year(Quarter) >= 2000)
+recent_production %>% gg_lag(Beer, geom = "point")
+
+#this visualization makes clear that at lag = 4 and lag = 8, r is high
+#otw r is low at lag = 2 and lag = 6 since the quarters rolls over to the previous year
+recent_production %>% gg_lag(Beer, geom = "path")
+```
+
+### Autocorrelation
+
+We have arrived!
+
+The ACF function
+$$
+\def\ybar{\overline{y}}
+r_{k} = \frac{\sum_{t=k+1}^{T} (y_t-\ybar)(y_{t-k} - \ybar)}{\sum_{t=1}^{T} (y_t - \ybar)^2}
+$$
+This measures at lag k, how much the series regresses upon itself, linearly
+
+```{r}
+#correlogram
+recent_production %>% ACF(Beer, lag_max = 9)
+
+acf(recent_production$Beer, type = "correlation", lag.max = 9, plot = TRUE)
+
+#much seasonal, little trend
+recent_production %>% 
+  ACF(Beer) %>% 
+  autoplot()
+
+#both the trend and seasonality
+a10 %>% 
+  ACF(Cost, lag_max = 48) %>% 
+  autoplot()
+
+```
+
+### White noise
+
+```{r}
+set.seed(30)
+y <- tsibble(sample = 1:50, wn = rnorm(50), index = sample)
+y %>% autoplot(wn) + labs(title = "White noise")
+y %>% 
+  ACF(wn) %>% 
+  autoplot()
+```
+
+### Exercises
+
+```{r, include= FALSE}
+#Exercises
+#2 GAFA
+
+goog_max <- gafa_stock %>%
+  mutate(max_Close = max(Close)) %>% 
+  filter(Symbol == "GOOG", Close == max_Close)
+
+#3 Tute 1
+
+tute1 <- read_csv("/Users/Jacques/Downloads/tute1.csv")
+myts <- tute1 %>% 
+  mutate(Quarter = yearmonth(Quarter)) %>% 
+  as_tsibble(index = Quarter)
+
+myts %>% 
+  pivot_longer(-Quarter) %>% 
+  ggplot(aes(x = Quarter, y = value, colour = name)) +
+  geom_line() +
+  facet_grid(name ~ ., scales = "free_y")
+
+#4 USgas
+
+us_total %>% 
+  tsibble(
+    key = state,
+    index = year)
+
+new_england <- us_total %>% 
+  group_by(state) %>% 
+  filter(
+    state == "Maine" | 
+    state == "Vermont" | 
+    state == "New Hampshire" | 
+    state == "Connecticut" |  
+    state == "Massachussets" | 
+    state == "Rhode Island")
+         
+new_england %>%         
+  ggplot(aes(x = year, y = y)) +
+  geom_line() +
+  facet_wrap(vars(state), scales = "free_y") +
+    labs(title = "Annual Nat Gas consumptions by state for New England")
+str(us_total)
+
+#5 Tourism
+tourism_xl <- read_xlsx("/Users/Jacques/Downloads/tourism.xlsx")
+#view(tourism_xl)
+
+tourism_xl <- tourism_xl %>% 
+  mutate(Quarter = yearquarter(Quarter)) %>% 
+  as_tsibble(
+    key = c(Region, State, Purpose),
+    index = Quarter)
+#tourism == tourism_xl
+#
+tourism_ft <- tourism_xl %>%
+  group_by(Region, Purpose) %>% 
+  slice_max(Trips, n = 1)
+
+row_ft <- which.max(tourism_ft$Trips)
+max_pair <- c(tourism_ft[row_ft, 2], tourism_ft[row_ft, 4])
+max_pair
+
+#6 Time plots
+autoplot(aus_production, Bricks)
+autoplot(pelt, Lynx)
+autoplot(gafa_stock, Close)
+autoplot(vic_elec, Demand) +
+  labs(y="Demand, in gW",
+       x ="Date",
+       title = "Electricity demand for Victoria, Australia")
+
+#7 aus_arrivals
+aus_arrivals
+aus_arrivals_ft <- aus_arrivals %>% 
+  group_by(Origin)
+
+aus_arrivals_ft %>% 
+  autoplot(Arrivals)
+aus_arrivals_ft %>% 
+  gg_season(Arrivals)
+aus_arrivals_ft %>% 
+  gg_subseries(Arrivals)
+#I identify odd points 
+#at Q3, US around 1990 the double spike
+#at Q2, Q3, Q4 of Japan around 2004 the dip is off bc we dont see it in other countries
+#Q2 and Q3 data for UK is near flat
+
+#8 aus_retail
+
+aus_retail
+set.seed(12345678)
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+
+#strong trend, seasonality in December month and slightly in summer
+#1996-1997 there is a massive spike that looks unusual
+myseries %>% 
+  autoplot(Turnover)
+myseries %>% 
+  gg_season(Turnover)
+myseries %>% 
+  gg_subseries(Turnover)
+myseries %>% 
+  gg_lag(Turnover, lags = 1:12)
+us_employment
+
+total_private <- us_employment %>%
+  filter(Title == "Total Private")
+ 
+total_private %>% 
+  autoplot(Employed)
+#thick lines usually means NBER recessions
+#really high AR
+total_private %>% 
+  gg_season(Employed)
+total_private %>% 
+  gg_subseries(Employed)
+acf(total_private$Employed, plot = TRUE)
+
+#10
+#3 == D
+#2 == A
+#1 == B
+#4 == C
+
+#11 aus_livestock
+
+ 
+#12 Goog daily price   
+dgoog <- gafa_stock %>%
+  filter(Symbol == "GOOG", year(Date) >= 2018) %>%
+  mutate(trading_day = row_number()) %>%
+  update_tsibble(index = trading_day, regular = TRUE) %>%
+  mutate(diff = difference(Close))
+```
+
+#3: Time series decomposition
+------------------------------------------------------------
+
+Subgrouping our data into "facets" is very useful for forecasting
+Three components: A trend-cycle comp., a seasonal component and a remainder (noise, innovation)
+
+### Transformations and adjustments
+
+We can make adjustments based on population, calendar spreads (for ex. different # of days in montly data), inflation
+
+```{r}
+#population
+global_economy %>%
+  filter(Country == "Australia") %>%
+  autoplot(GDP/Population) + labs(y = "GDP per capita ($US)")
+
+print_retail <- aus_retail %>%
+  filter(Industry == "Newspaper and book retailing") %>%
+  group_by(Industry) %>%
+  index_by(Year = year(Month)) %>%
+  summarise(Turnover = sum(Turnover))
+aus_economy <- global_economy %>%
+  filter(Code == "AUS")
+print_retail %>%
+  left_join(aus_economy, by = "Year") %>%
+  mutate(Adjusted_turnover = Turnover / CPI * 100) %>%
+  pivot_longer(c(Turnover, Adjusted_turnover), 
+               values_to = "Turnover") %>%
+  ggplot(aes(x = Year, y = Turnover)) +
+  geom_line() +
+  facet_grid(name ~ ., scales = "free_y") +
+  labs(
+    y = "$A", 
+    title = "Turnover for the Australian print media industry")
+
+```
+
+Mathematical tranformations can be made to the observational data
+For example, we can use the power transformations $w_t = y_t^p, p\in {N}$
+
+The Box-Cox transformations are a special kind of power trasnformations
+$$
+w_t  =
+    \begin{cases}
+      \log(y_t) && if \lambda=0;  \\
+      \text{sign}(y_t)(|y_t|^\lambda-1)/\lambda && \text{otherwise}.
+    \end{cases}
+$$
+A `guerrero` feature automatically selects a $\lambda$ value for you.
+
+```{r}
+lambda <- aus_production %>%
+  features(Gas, features = guerrero) %>%
+  pull(lambda_guerrero)
+aus_production %>% autoplot(box_cox(Gas, lambda))
+  
+```
+
+### Time series components
+
+$y_{t} = S_{t} + T_{t} + R_t$
+$y_t$ is the data, $S_t$ is the seasonal comp, $T_t$ is the trend-cycle comp and $R_t$ is the noise
+
+```{r}
+us_retail_employment <- us_employment %>%
+  filter(year(Month) >= 1990, Title == "Retail Trade") %>%
+  select(-Series_ID)
+
+autoplot(us_retail_employment, Employed) +
+  labs(
+    y = "Persons (thousands)", 
+    title = "Total employment in US retail"
+  )
+dcmp <- us_retail_employment %>%
+  model(STL(Employed))
+autoplot(us_retail_employment, Employed, color = "gray") +
+  autolayer(components(dcmp), trend, color = "red") +
+  labs(
+    y = "Persons (thousands)", 
+    title = "Total employment in US retail"
+  )
+components(dcmp) %>% autoplot()
+
+autoplot(us_retail_employment, Employed, color = "gray") +
+  autolayer(components(dcmp), season_adjust, color = "blue") +
+  labs(
+    y = "Persons (thousands)", 
+    title = "Total employment in US retail"
+  )
+
+```
+
+### Moving averages
+
+The m-MA is written as
+$$
+\begin{equation}
+  \hat{T}_{t} = \frac{1}{m} \sum_{j=-k}^k y_{t+j}
+\end{equation}
+$$
+
+```{r}
+global_economy %>%
+  filter(Country == "Australia") %>%
+  autoplot(Exports) +
+  labs(y = "% of GDP", title = "Total Australian exports")
+
+aus_exports <- global_economy %>%
+  filter(Country == "Australia") %>%
+  mutate(
+    `5-MA` = slider::slide_dbl(Exports, mean, 
+                .before = 2, .after = 2, .complete = TRUE)
+  )
+
+autoplot(aus_exports, Exports) +
+  autolayer(aus_exports, `5-MA`, color = "red") +
+  labs(
+    y = "Exports (% of GDP)", 
+    title = "Total Australian exports"
+  ) +
+  guides(colour = guide_legend(title = "series"))
+
+#MA of MA
+beer <- aus_production %>%
+  filter(year(Quarter) >= 1992) %>%
+  select(Quarter, Beer)
+beer_ma <- beer %>%
+  mutate(
+    `4-MA` = slider::slide_dbl(Beer, mean, 
+                .before = 1, .after = 2, .complete = TRUE),
+    `2x4-MA` = slider::slide_dbl(`4-MA`, mean, 
+                .before = 1, .after = 0, .complete = TRUE)
+  )
+
+us_retail_employment_ma <- us_retail_employment %>%
+  mutate(
+    `12-MA` = slider::slide_dbl(Employed, mean, 
+                .before = 5, .after = 6, .complete = TRUE),
+    `2x12-MA` = slider::slide_dbl(`12-MA`, mean, 
+                .before = 1, .after = 0, .complete = TRUE)
+  )
+autoplot(us_retail_employment_ma, Employed, color = "gray") +
+  autolayer(us_retail_employment_ma, vars(`2x12-MA`), 
+            color = "red") +
+  labs(y = "Persons (thousands)",
+       title = "Total employment in US retail")
+```
+
+An important note is that for even seasons (ex. quarter, months) is it highly recommended to use a 2Xm-MA for m seasons.
+For odd seasons, or other uses, use the simple m-MA which is already centered
+
+Moving averages can also be computed with a weighted window which smooths out the endpoint effect
+an example is the following window: $\left[\frac{1}{8},\frac{1}{4},\frac{1}{4},\frac{1}{4},\frac{1}{8}\right]$
+
+### X11 decomp
+
+This method was developed by BLS and StatsCan. It starts with a classical decomp, and lets the seasonal comp drift. It also allows for some irregulary spaced calendars. It tends to be way more robust than the classical decomp
+
+```{r}
+#this code doesn't work!!
+# x11_dcmp <- us_retail_employment %>%
+#   model(x11 = feasts:::X11(Employed, type = "additive")) %>%
+#   components()
+# autoplot(x11_dcmp) +
+#   labs(title =
+#     "Additive X11 decomposition of US retail employment")
+#
+# x11_dcmp %>%
+# ggplot(aes(x = Month)) +
+# geom_line(aes(y = Employed, colour = "Data")) +
+# geom_line(aes(y = season_adjust,
+#               colour = "Seasonally Adjusted")) +
+# geom_line(aes(y = trend, colour = "Trend")) +
+# labs(y = "Persons (thousands)",
+#      title = "Total employment in US retail") +
+# scale_colour_manual(
+#   values = c("gray", "blue", "red"),
+#   breaks = c("Data", "Seasonally Adjusted", "Trend")
+# )
+# # x11_dcmp %>%
+# gg_subseries(seasonal)
+```
+
+### SEATS decomp
+
+SEATS = Seasonal Extraction of ARIMA Time Series
+widely used at government agencies
+
+This only works with monthly and qtrly data
+
+```{r}
+# tourism %>%
+#   group_by(Purpose) %>%
+#   summarise(Trips = sum(Trips)) %>%
+#   model(STL(Trips ~ season(window = 5))) %>%
+#   components()
+# seats_dcmp <- us_retail_employment %>%
+#   model(seats = feasts:::SEATS(Employed)) %>%
+#   components()
+# autoplot(seats_dcmp) +
+#   labs(title =
+#     "SEATS decomposition of total US retail employment")
+#
+# seats_dcmp <- us_retail_employment %>%
+# model(seats = feasts:::SEATS(Employed)) %>%
+#   components()
+```
+
+### STL decomp
+
+It is the recommended method
+If $\lambda = 1$ then it is set to additive decompostion while a $\lambda = 0$ parameter yield multiplicative decomp
+
+```{r}
+#trend window is the is the # of consecutive observations to be used for T_t
+#using a longer trend window creates leakages from regim changes into the remainder
+#default is set to season(window = 13) and trend(window = 21)
+us_retail_employment %>%
+  model(
+    STL(Employed ~ trend(window = 7) + 
+              season(window = "periodic"),
+    robust = TRUE)) %>%
+  components() %>%
+  autoplot()
+```
+
+### Exercises
+
+```{r, include=FALSE}
+
+```
+
+#4: Time series features
+------------------------------------------------------------
+
+### Some statistics
+
+```{r}
+tourism %>% 
+  features(Trips, list(mean = mean)) %>% 
+  arrange(mean)
+
+tourism %>% 
+  features(Trips, list(quantile, mean = mean)) %>% 
+  
+  
+```
+
