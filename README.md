@@ -1,4 +1,8 @@
 # fpp3_hyndman
+![image](https://user-images.githubusercontent.com/43116564/110698116-3bf96680-81bb-11eb-9c47-8a4d2ea59ece.png)
+
+
+
 This is a read-along .rmd file detailing sections of the Forecasting: Principles and Practice book by Rob J Hyndman and George Athanasopoulos
 
 The otext can be found for free here https://otexts.com/fpp3/
