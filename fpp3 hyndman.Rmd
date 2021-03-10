@@ -13,8 +13,6 @@ output:
 
 
 ```{r setup, include=FALSE, }
-#install.packages("fpp3") 
-#installing fpp3
 library(fpp3)
 library(tidyverse)
 library(knitr)
@@ -31,7 +29,7 @@ knitr::opts_chunk$set(autodep = TRUE)
 ```
 
 
-#1: Getting Started
+# Ch1: Getting Started
 ------------------------------------------------------------
 
 Basic premise of any forecasting:
@@ -64,7 +62,7 @@ Exercises:
 
 Looking forward to `code`
 
-#2: Time series graphics
+# Ch2: Time series graphics
 ------------------------------------------------------------
 
 ### `tsibble` objects
@@ -92,13 +90,11 @@ Sub-daily  | `as_datetime()`
 ```{r}
 #this dataset is posted at 4yr intervals
 str(olympic_running)
-
 PBS %>%
   filter(ATC2 == "A10") %>%
   select(Month, Concession, Type, Cost) %>%
   summarise(TotalC = sum(Cost)) %>%
   mutate(Cost = TotalC / 1e6) -> a10
-
 #converting a csv into tsibble
 prison <- read_csv("https://OTexts.com/fpp3/extrafiles/prison_population.csv")
 prison <- prison %>% 
@@ -107,7 +103,6 @@ prison <- prison %>%
   as_tsibble(
     key = c(State, Gender, Legal, Indigenous),
     index = Quarter)
-
 #contains 8 X 2 X 2 X 2 = 64 time series
 #64 X 48 Observations for quarters = 3072 rows
 prison
@@ -124,7 +119,6 @@ mel_syd_economy <- ansett %>%
 autoplot(mel_syd_economy, Passengers) +
   labs(title = "Ansett economy class passengers",
        subtitle = "Melbourne-Sydney")
-
 #ts with seasonality, strong trend
 autoplot(a10, Cost)
   labs(y = "$million", title = "Antidiabetic drug sales")
@@ -145,20 +139,16 @@ a10 %>%
   gg_season(Cost, label = "both") +
   labs(y = "$ million",
        title = "Seasonal plot : antidiabetic drug sales")
-
 #the following plot is garbage for now 
 #by day
 vic_elec %>% gg_season(Demand, period = "day") +
   theme(legend.position = "none")
-
 #by week
 vic_elec %>% gg_season(Demand, period = "week") +
   theme(legend.position = "none")
-
 #by year
 vic_elec %>% gg_season(Demand, period = "year") +
   theme(legend.position = "right")
-
 ```
 
 The strength of `gg_season` plots is that it can visualise possible features of the data
@@ -185,18 +175,14 @@ holidays <- tourism %>%
   filter(Purpose == "Holiday") %>% 
   group_by((State)) %>% 
   summarise(Trips = sum(Trips))
-
 holidays
-
 #this plot shows strong but differing seasonality in btw groups
 autoplot(holidays, Trips) +
   labs(y = "Trips, in thousands",
        title = "Australian domestic holiday nights")
-
 gg_season(holidays, Trips) +
   labs(y = "Trips, in thousands",
        title = "Australian domestic holiday nights")
-
 #the South states are strongest in Q4, while the North states are strongest in Q3
 #Western Australia tourism has also jumped recently
 holidays %>% gg_subseries(Trips) +
@@ -216,14 +202,12 @@ vic_elec %>%
     labs(
       y = "Demand (gW)",
       title = "Half-hourly electricity demand: Victoria, Australia")
-
 vic_elec %>%
   filter(year(Time) == 2014) %>%
   autoplot(Temperature) +
   labs(
     y = "Temperature (degrees Celsius)",
     title = "Half-hourly temperatures: Melbourne, Australia")
-
 vic_elec %>% 
   filter(year(Time) == 2014) %>% 
   ggplot(aes(x = Temperature, y = Demand)) +
@@ -245,7 +229,6 @@ visitors %>%
   geom_line() +
   facet_wrap(vars(State), scales = "free_y") +
     labs(y = "Number of visitor nights per quarter (in Millions)")
-
 visitors %>%
   pivot_wider(values_from = Trips, names_from = State) %>%   
   GGally::ggpairs(columns = 2:9)
@@ -257,7 +240,6 @@ visitors %>%
 recent_production <- aus_production %>% 
   filter(year(Quarter) >= 2000)
 recent_production %>% gg_lag(Beer, geom = "point")
-
 #this visualization makes clear that at lag = 4 and lag = 8, r is high
 #otw r is low at lag = 2 and lag = 6 since the quarters rolls over to the previous year
 recent_production %>% gg_lag(Beer, geom = "path")
@@ -277,19 +259,15 @@ This measures at lag k, how much the series regresses upon itself, linearly
 ```{r}
 #correlogram
 recent_production %>% ACF(Beer, lag_max = 9)
-
 acf(recent_production$Beer, type = "correlation", lag.max = 9, plot = TRUE)
-
 #much seasonal, little trend
 recent_production %>% 
   ACF(Beer) %>% 
   autoplot()
-
 #both the trend and seasonality
 a10 %>% 
   ACF(Cost, lag_max = 48) %>% 
   autoplot()
-
 ```
 
 ### White noise
@@ -308,31 +286,24 @@ y %>%
 ```{r, include= FALSE}
 #Exercises
 #2 GAFA
-
 goog_max <- gafa_stock %>%
   mutate(max_Close = max(Close)) %>% 
   filter(Symbol == "GOOG", Close == max_Close)
-
 #3 Tute 1
-
 tute1 <- read_csv("/Users/Jacques/Downloads/tute1.csv")
 myts <- tute1 %>% 
   mutate(Quarter = yearmonth(Quarter)) %>% 
   as_tsibble(index = Quarter)
-
 myts %>% 
   pivot_longer(-Quarter) %>% 
   ggplot(aes(x = Quarter, y = value, colour = name)) +
   geom_line() +
   facet_grid(name ~ ., scales = "free_y")
-
 #4 USgas
-
 us_total %>% 
   tsibble(
     key = state,
     index = year)
-
 new_england <- us_total %>% 
   group_by(state) %>% 
   filter(
@@ -349,11 +320,9 @@ new_england %>%
   facet_wrap(vars(state), scales = "free_y") +
     labs(title = "Annual Nat Gas consumptions by state for New England")
 str(us_total)
-
 #5 Tourism
 tourism_xl <- read_xlsx("/Users/Jacques/Downloads/tourism.xlsx")
 #view(tourism_xl)
-
 tourism_xl <- tourism_xl %>% 
   mutate(Quarter = yearquarter(Quarter)) %>% 
   as_tsibble(
@@ -364,11 +333,9 @@ tourism_xl <- tourism_xl %>%
 tourism_ft <- tourism_xl %>%
   group_by(Region, Purpose) %>% 
   slice_max(Trips, n = 1)
-
 row_ft <- which.max(tourism_ft$Trips)
 max_pair <- c(tourism_ft[row_ft, 2], tourism_ft[row_ft, 4])
 max_pair
-
 #6 Time plots
 autoplot(aus_production, Bricks)
 autoplot(pelt, Lynx)
@@ -377,12 +344,10 @@ autoplot(vic_elec, Demand) +
   labs(y="Demand, in gW",
        x ="Date",
        title = "Electricity demand for Victoria, Australia")
-
 #7 aus_arrivals
 aus_arrivals
 aus_arrivals_ft <- aus_arrivals %>% 
   group_by(Origin)
-
 aus_arrivals_ft %>% 
   autoplot(Arrivals)
 aus_arrivals_ft %>% 
@@ -393,14 +358,11 @@ aus_arrivals_ft %>%
 #at Q3, US around 1990 the double spike
 #at Q2, Q3, Q4 of Japan around 2004 the dip is off bc we dont see it in other countries
 #Q2 and Q3 data for UK is near flat
-
 #8 aus_retail
-
 aus_retail
 set.seed(12345678)
 myseries <- aus_retail %>%
   filter(`Series ID` == sample(aus_retail$`Series ID`,1))
-
 #strong trend, seasonality in December month and slightly in summer
 #1996-1997 there is a massive spike that looks unusual
 myseries %>% 
@@ -412,7 +374,6 @@ myseries %>%
 myseries %>% 
   gg_lag(Turnover, lags = 1:12)
 us_employment
-
 total_private <- us_employment %>%
   filter(Title == "Total Private")
  
@@ -425,15 +386,12 @@ total_private %>%
 total_private %>% 
   gg_subseries(Employed)
 acf(total_private$Employed, plot = TRUE)
-
 #10
 #3 == D
 #2 == A
 #1 == B
 #4 == C
-
 #11 aus_livestock
-
  
 #12 Goog daily price   
 dgoog <- gafa_stock %>%
@@ -443,7 +401,7 @@ dgoog <- gafa_stock %>%
   mutate(diff = difference(Close))
 ```
 
-#3: Time series decomposition
+# Ch3: Time series decomposition
 ------------------------------------------------------------
 
 Subgrouping our data into "facets" is very useful for forecasting
@@ -458,7 +416,6 @@ We can make adjustments based on population, calendar spreads (for ex. different
 global_economy %>%
   filter(Country == "Australia") %>%
   autoplot(GDP/Population) + labs(y = "GDP per capita ($US)")
-
 print_retail <- aus_retail %>%
   filter(Industry == "Newspaper and book retailing") %>%
   group_by(Industry) %>%
@@ -477,7 +434,6 @@ print_retail %>%
   labs(
     y = "$A", 
     title = "Turnover for the Australian print media industry")
-
 ```
 
 Mathematical tranformations can be made to the observational data
@@ -510,7 +466,6 @@ $y_t$ is the data, $S_t$ is the seasonal comp, $T_t$ is the trend-cycle comp and
 us_retail_employment <- us_employment %>%
   filter(year(Month) >= 1990, Title == "Retail Trade") %>%
   select(-Series_ID)
-
 autoplot(us_retail_employment, Employed) +
   labs(
     y = "Persons (thousands)", 
@@ -525,14 +480,12 @@ autoplot(us_retail_employment, Employed, color = "gray") +
     title = "Total employment in US retail"
   )
 components(dcmp) %>% autoplot()
-
 autoplot(us_retail_employment, Employed, color = "gray") +
   autolayer(components(dcmp), season_adjust, color = "blue") +
   labs(
     y = "Persons (thousands)", 
     title = "Total employment in US retail"
   )
-
 ```
 
 ### Moving averages
@@ -549,14 +502,12 @@ global_economy %>%
   filter(Country == "Australia") %>%
   autoplot(Exports) +
   labs(y = "% of GDP", title = "Total Australian exports")
-
 aus_exports <- global_economy %>%
   filter(Country == "Australia") %>%
   mutate(
     `5-MA` = slider::slide_dbl(Exports, mean, 
                 .before = 2, .after = 2, .complete = TRUE)
   )
-
 autoplot(aus_exports, Exports) +
   autolayer(aus_exports, `5-MA`, color = "red") +
   labs(
@@ -564,7 +515,6 @@ autoplot(aus_exports, Exports) +
     title = "Total Australian exports"
   ) +
   guides(colour = guide_legend(title = "series"))
-
 #MA of MA
 beer <- aus_production %>%
   filter(year(Quarter) >= 1992) %>%
@@ -576,7 +526,6 @@ beer_ma <- beer %>%
     `2x4-MA` = slider::slide_dbl(`4-MA`, mean, 
                 .before = 1, .after = 0, .complete = TRUE)
   )
-
 us_retail_employment_ma <- us_retail_employment %>%
   mutate(
     `12-MA` = slider::slide_dbl(Employed, mean, 
@@ -672,10 +621,9 @@ us_retail_employment %>%
 ### Exercises
 
 ```{r, include=FALSE}
-
 ```
 
-#4: Time series features
+# Ch4: Time series features
 ------------------------------------------------------------
 
 ### Some statistics
@@ -684,7 +632,6 @@ us_retail_employment %>%
 tourism %>% 
   features(Trips, list(mean = mean)) %>% 
   arrange(mean)
-
 tourism %>% 
   features(Trips, list(quantile, mean = mean)) %>% 
   arrange(mean)
@@ -717,18 +664,15 @@ Note the above expression for trend is similarly used to measure seasonality. St
 ```{r}
 tourism %>%
   features(Trips, feat_stl) 
-
 tourism %>%
   features(Trips, feat_stl) %>% 
   arrange(trend_strength)
-
 tourism %>%
   features(Trips, feat_stl) %>%
   ggplot(aes(x = trend_strength, y = seasonal_strength_year, 
              col = Purpose)) +
   geom_point() +
   facet_wrap(vars(State))
-
 #this code shows the most seasonal series
 tourism %>%
   features(Trips, feat_stl) %>%
@@ -739,7 +683,6 @@ tourism %>%
   ggplot(aes(x = Quarter, y = Trips)) +
   geom_line() +
   facet_grid(vars(State, Region, Purpose))
-
 ```
 
 ### Exploring autralian tourism data
@@ -749,7 +692,6 @@ tourism %>%
 tourism_feats <- tourism %>% 
   features(Trips, feature_set(pkgs = "feasts"))
 tourism_feats
-
 #using glue pkg
 #be aware of the syntax
 #we notice that the 3 seasonal measures are positively correlated
@@ -761,12 +703,10 @@ tourism_feats %>%
     seasonal_trough_year = glue("Q{seasonal_trough_year+1}"),
   ) %>% 
   GGally::ggpairs(mapping = aes(colour = Purpose))
-
 #using broom pkg
 #we can futher explore the 48 features by using pca. pca groups features together and so reduces dimensionality. 
 #note that pca1 explains most variations of the date &
 #pca2 is meant to be uncorrelated to pca1
-
 #the plot tells us that PC2 delineates holiday series
 pc_dcmp <- tourism_feats %>% 
   select(-State, -Region, -Purpose) %>%
@@ -776,12 +716,10 @@ pc_dcmp %>%
   ggplot(aes(x= .fittedPC1, y = .fittedPC2, col = Purpose)) +
   geom_point() +
   theme(aspect.ratio = 1)
-
 #drill to the anomalies in pca
 outliers <- pc_dcmp %>%
   filter(.fittedPC1 > 10) %>%
   select(Region, State, Purpose, .fittedPC1, .fittedPC2)
-
 outliers %>%
   left_join(tourism, by = c("State", "Region", "Purpose")) %>%
   mutate(
@@ -792,7 +730,6 @@ outliers %>%
   geom_line() +
   facet_grid(Series ~ ., scales = "free") +
   labs(title = "Outlying time series in PC space")
-
 ```
 
 ### Exercises
@@ -846,10 +783,9 @@ outliers %>%
 #   geom_line() +
 #   facet_grid(Series ~ ., scales = "free") +
 #   labs(title = "Outlying time series in PC space")
-
 ```
 
-#5: Forecaster's toolbox
+# Ch5: Forecaster's toolbox
 ------------------------------------------------------------
 
 ### Tidy workflow
@@ -862,29 +798,23 @@ we will be using gdp data
 #tiny tidy
 gdppc <- global_economy %>% 
   mutate(GDP_per_capita = GDP / Population)
-
 #visualise
 gdppc %>%
   filter(Country == "Sweden") %>%
   autoplot(GDP_per_capita) +
   labs(y = "$US", title = "GDP per capita for Sweden")
-
 #specify/estimate
 fit <- gdppc %>%
   model(trend_model = TSLM(GDP_per_capita ~ trend()))
-
 #skip evaluate
-
 #forecast
 fit %>% forecast(h = "3 years")
-
 fit %>%
   forecast(h = "3 years") %>%
   filter(Country == "Sweden") %>%
   autoplot(gdppc) +
   labs(y = "$US", title = "GDP per capita for Sweden")
   
-
 ```
 
 ### basic forecasting tools
@@ -895,23 +825,18 @@ these will only be considered for benchmarking purposes
 #truncate a few years
 bricccsquad <- aus_production %>% 
   filter_index("1970 Q1" ~ "2004 Q4")
-
 #average method
 mean_brick <- bricccsquad %>% 
   model(mean_model = MEAN(Bricks))
-
 mean_brick %>% 
   forecast(h = "3 years") %>% 
   autolayer(bricccsquad)
-
 #naive method
 bricccsquad %>% 
   model(NAIVE(Bricks))
-
 #Drift method
 bricccsquad %>% 
   model(RW(Bricks ~ drift()))
-
 #combining all above methods
 # Set training data from 1992 to 2006
 train <- aus_production %>%
@@ -937,7 +862,6 @@ beer_fc %>%
     title = "Forecasts for quarterly beer production"
   ) +
   guides(colour = guide_legend(title = "Forecast"))
-
 #try for the bricks
 # Set training data from 1992 to 2006
 train_briccc <- aus_production %>%
@@ -948,7 +872,6 @@ brick_fit <- train %>%
     Mean = MEAN(Bricks),
     `Naïve` = NAIVE(Bricks),
     `Seasonal naïve` = SNAIVE(Bricks))
-
 # Generate forecasts for 14 quarters
 brick_fc <- brick_fit %>% 
   forecast(h = 14)
@@ -964,7 +887,6 @@ brick_fc %>%
     title = "Forecasts for quarterly bricks production"
   ) +
   guides(colour = guide_legend(title = "Forecast"))
-
 #he also likes to forecast google stock price 1-mt ahead
 # Re-index based on trading days
 google_stock <- gafa_stock %>%
@@ -993,7 +915,6 @@ google_fc %>%
        title = "Google stock prices (Jan 2015 - Jan 2016)") +
   guides(colour = guide_legend(title = "Forecast"))
 #as we can see this method is not necessarily the strongest
-
 ```
 
 ### Fitted values and resids
@@ -1026,14 +947,11 @@ $$
 aug <- google_2015 %>%
   model(NAIVE(Close)) %>%
   augment()
-
 #these both show that the residuals are not distinguishable from wn
 aug %>% features(.innov, box_pierce, lag = 10, dof = 0)
 aug %>% features(.innov, ljung_box, lag = 10, dof = 0)
-
 fit <- google_2015 %>% model(RW(Close ~ drift()))
 tidy(fit)
-
 augment(fit) %>% features(.innov, ljung_box, lag=10, dof=1)
 ```
 
@@ -1059,13 +977,11 @@ google_2015 %>%
   model(NAIVE(Close)) %>%
   forecast(h = 10) %>%
   autoplot(google_2015)
-
 #bootstrapped residuals
 fit <- google_2015 %>%
   model(NAIVE(Close))
 sim <- fit %>% generate(h = 30, times = 5, bootstrap = TRUE)
 sim
-
 #plot the 5 paths
 google_2015 %>%
   ggplot(aes(x = day)) +
@@ -1074,17 +990,199 @@ google_2015 %>%
     data = sim) +
   labs(title = "Google closing stock price") +
   guides(col = FALSE)
-
 #bootstrap PI
 fc <- fit %>% forecast(h = 30, bootstrap = TRUE)
-
 autoplot(fc, google_2015) +
   labs(title = "Google stock closing price")
-
 google_2015 %>% 
   model(NAIVE(Close)) %>% 
   forecast(h = 10, bootstrap = TRUE, times = 1000) %>% 
   hilo()
+```
+
+### Forecasting with decomposition
+
+```{r}
+us_retail_employment <- us_employment %>%
+  filter(year(Month) >= 1990, Title == "Retail Trade")
+dcmp <- us_retail_employment %>%
+  model(STL(Employed ~ trend(window = 7), robust = TRUE)) %>%
+  components() %>%
+  select(-.model)
+dcmp %>%
+  model(NAIVE(season_adjust)) %>%
+  forecast() %>%
+  autoplot(dcmp) +
+  labs(y = "Number of people employed",
+       title = "Naïve forecasts of seasonally adjusted data")
+
+fit_dcmp <- us_retail_employment %>%
+  model(stlf = decomposition_model(
+    STL(Employed ~ trend(window = 7), robust = TRUE),
+    NAIVE(season_adjust)
+  ))
+fit_dcmp %>%
+  forecast() %>%
+  autoplot(us_retail_employment)+
+  labs(y = "Number of people employed",
+       title = "Monthly US employment")
+```
+
+Skipping sections until 7.5, with some sparse aadditions of code
+
+```{r}
+#from 7.1
+us_change %>% 
+  GGally::ggpairs(columns = 2:6)
+
+us_change %>% 
+  model(TSLM(Consumption ~ Income)) %>% 
+  report()
+
+us_change %>% 
+  model(TSLM(Consumption ~ Income)) %>% 
+  report()
+
+#from 7.2
+fit.consMR <- us_change %>%
+  model(tslm = TSLM(Consumption ~ Income + Production +
+                                    Unemployment + Savings))
+report(fit.consMR)
+
+augment(fit.consMR) %>%
+  ggplot(aes(x = Quarter)) +
+  geom_line(aes(y = Consumption, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = NULL,
+    title = "Percent change in US consumption expenditure"
+  ) +
+  scale_color_manual(values=c(Data="black",Fitted="red")) +
+  guides(colour = guide_legend(title = NULL))
+
+```
+# Ch7: TS regression models
+------------------------------------------------------------
+
+### Evaluating regression model
+
+The method presented in this book is wildly different to the one presented in modelr pkg. We will re-use the conMR model presented above
+
+```{r}
+#gg_tsdisplay is a panel chart that wraps the data for displaying one series' acf 
+fit.consMR %>% gg_tsresiduals()
+
+tsibbledata::aus_retail %>%
+  filter(
+    State == "Victoria",
+    Industry == "Cafes, restaurants and catering services"
+  ) %>%
+  gg_tsdisplay(Turnover, plot_type = "scatter")
+
+augment(fit.consMR) %>% 
+  features(.innov, ljung_box, lag = 10, dof = 5)
+
+us_change %>%
+  left_join(residuals(fit.consMR), by = "Quarter") %>%
+  pivot_longer(Income:Unemployment,
+               names_to = "regressor", values_to = "x") %>%
+  ggplot(aes(x = x, y = .resid)) +
+  geom_point() +
+  facet_wrap(. ~ regressor, scales = "free_x") +
+  labs(y = "Residuals", x = "")
+
+#it seems hyndman's approach is way more scalable to more models than the one prescribed in r4ds
+
+augment(fit.consMR) %>% 
+  ggplot(aes(x = .fitted, y = .resid)) +
+  geom_point() +
+  labs(x = "Fitted",
+       y = "Rediduals")
+
+```
+### Useful predictors
+
+trend, dummies, interventions, other effects
+```{r}
+#TSLM automatically handles the dummies when season() is added
+recent_production <- aus_production %>%
+  filter(year(Quarter) >= 1992)
+fit_beer <- recent_production %>%
+  model(TSLM(Beer ~ trend() + season()))
+report(fit_beer)
+#what the report says is : Q2 produces 34.7megaL less than in Q1, Q4 produces 72megaL more than Q1
+
+augment(fit_beer) %>%
+  ggplot(aes(x = Beer, y = .fitted,
+             colour = factor(quarter(Quarter)))) +
+  geom_point() +
+  labs(y = "Fitted", x = "Actual values",
+       title = "Quarterly beer production") +
+  geom_abline(intercept = 0, slope = 1) +
+  guides(colour = guide_legend(title = "Quarter"))
+```
+### Selecting predictors
+
+This section deals with the alphabet of AIC, BIC, etc which are measures of efficiency btw models
+
+*   Adj $R^2$: penalizes overfitting by adding more quantity of predictors
+*   Cross-validation (CV): comes from models fitted when leaving out observations. these yield errors and thus MSE. we minimize the CV
+*   Akaike Info Criterion (AIC): AIC measures the error from the model and adds penalty for the nb of predictors
+*   Corrected Akaike Info Criterion (AIC): AIC corrected for small sample models
+*   Bayesian Info Criterion (BIC): AIC but with a larger penalty
+
+For large datasets, these indicators will yield more or less the same results
+
+```{r}
+glance(fit.consMR) %>% 
+  select(adj_r_squared, CV, AIC, AICc, BIC)
+
+fit.consMR_2 <- us_change %>%
+  model(
+    tslm1 = TSLM(Consumption ~ Income + Production + Unemployment + Savings),
+    tslm2 = TSLM(Consumption ~ Income + Production + Unemployment),
+    tslm3 = TSLM(Consumption ~ Income + Production + Savings),
+    tslm4 = TSLM(Consumption ~ Income + Savings + Unemployment),
+    tslm5 = TSLM(Consumption ~ Income + Savings),
+    tslm6 = TSLM(Consumption ~ Savings + Production + Unemployment),
+    tslm7 = TSLM(Consumption ~ Income + Unemployment),
+    tslm8 = TSLM(Consumption ~ Income + Production)
+    )
+
+report(fit.consMR_2)
+
+```
+
+```{r}
+#We are stepping aside for some stepwise regression
+#The basic idea is to start with the most general model and work backward form there
+#https://www.guru99.com/r-simple-multiple-linear-regression.html#8
+
+df <- mtcars %>% 
+mutate(cyl = factor(cyl),
+    vs = factor(vs),
+    am = factor(am),
+    gear = factor(gear),
+    carb = factor(carb))
+
+df <- mtcars %>% 
+  select(-c(am, vs, cyl, gear, carb))
+GGally::ggscatmat(df)
+
+require(olsrr)
+model <- mpg ~.
+fit <- lm(model, df)
+test <- ols_step_all_possible(fit)
+plot(test)
+
+steps <- ols_step_both_p(fit, details = TRUE)
+steps
+```
+
+# Ch8: Exponential smoothing
+------------------------------------------------------------
+
+```{r}
+
 
 ```
 
