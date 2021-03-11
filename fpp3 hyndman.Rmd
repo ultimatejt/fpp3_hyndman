@@ -12,6 +12,7 @@ output:
 (Isaiah 41:23)*
 
 
+
 ```{r setup, include=FALSE, }
 library(fpp3)
 library(tidyverse)
@@ -290,15 +291,15 @@ goog_max <- gafa_stock %>%
   mutate(max_Close = max(Close)) %>% 
   filter(Symbol == "GOOG", Close == max_Close)
 #3 Tute 1
-tute1 <- read_csv("/Users/Jacques/Downloads/tute1.csv")
-myts <- tute1 %>% 
-  mutate(Quarter = yearmonth(Quarter)) %>% 
-  as_tsibble(index = Quarter)
-myts %>% 
-  pivot_longer(-Quarter) %>% 
-  ggplot(aes(x = Quarter, y = value, colour = name)) +
-  geom_line() +
-  facet_grid(name ~ ., scales = "free_y")
+# tute1 <- read_csv("/Users/Jacques/Downloads/tute1.csv")
+# myts <- tute1 %>%
+#   mutate(Quarter = yearmonth(Quarter)) %>%
+#   as_tsibble(index = Quarter)
+# myts %>%
+#   pivot_longer(-Quarter) %>%
+#   ggplot(aes(x = Quarter, y = value, colour = name)) +
+#   geom_line() +
+#   facet_grid(name ~ ., scales = "free_y")
 #4 USgas
 us_total %>% 
   tsibble(
@@ -321,21 +322,21 @@ new_england %>%
     labs(title = "Annual Nat Gas consumptions by state for New England")
 str(us_total)
 #5 Tourism
-tourism_xl <- read_xlsx("/Users/Jacques/Downloads/tourism.xlsx")
-#view(tourism_xl)
-tourism_xl <- tourism_xl %>% 
-  mutate(Quarter = yearquarter(Quarter)) %>% 
-  as_tsibble(
-    key = c(Region, State, Purpose),
-    index = Quarter)
+# tourism_xl <- read_xlsx("/Users/Jacques/Downloads/tourism.xlsx")
+# #view(tourism_xl)
+# tourism_xl <- tourism_xl %>% 
+#   mutate(Quarter = yearquarter(Quarter)) %>% 
+#   as_tsibble(
+#     key = c(Region, State, Purpose),
+#     index = Quarter)
 #tourism == tourism_xl
 #
-tourism_ft <- tourism_xl %>%
-  group_by(Region, Purpose) %>% 
-  slice_max(Trips, n = 1)
-row_ft <- which.max(tourism_ft$Trips)
-max_pair <- c(tourism_ft[row_ft, 2], tourism_ft[row_ft, 4])
-max_pair
+# tourism_ft <- tourism_xl %>%
+#   group_by(Region, Purpose) %>% 
+#   slice_max(Trips, n = 1)
+# row_ft <- which.max(tourism_ft$Trips)
+# max_pair <- c(tourism_ft[row_ft, 2], tourism_ft[row_ft, 4])
+# max_pair
 #6 Time plots
 autoplot(aus_production, Bricks)
 autoplot(pelt, Lynx)
@@ -1181,8 +1182,166 @@ steps
 # Ch8: Exponential smoothing
 ------------------------------------------------------------
 
+### Simple exponential smoothing (SES)
+
+`model()` calls this `ETS(A,N,N)`
+
+The SES method gives a balanced approach between the Naive method (differencing) and the simple average method (draw a horizontal line through the past)
+It puts weights determined by $\alpha$ unto the past observations to generate a one-step ahead forecast
+*   Note that small values of $\alpha$ puts more weight on the past while large values of $\alpha$ weight the recent past heavily
+
+$$
+\begin{equation}
+  \hat{y}_{T+1|T} = \alpha y_T + \alpha(1-\alpha) y_{T-1} + \alpha(1-\alpha)^2 y_{T-2}+ \cdots,   \tag{8.1}
+\end{equation}
+\text{where 0} \leq \alpha \leq 1
+$$
+This takes on many forms. One form that comes from comparing all T equations gives the following formula, for $l_0$ is the time 1 fitted values. It shrinks to zero for large T.
+
+$$
+\begin{align*}
+  \hat{y}_{T+1|T} & =  \sum_{j=0}^{T-1} \alpha(1-\alpha)^j y_{T-j} + (1-\alpha)^T \ell_{0}
+\end{align*}
+$$
+
+```{r}
+algeria_economy <- global_economy %>% 
+  filter(Country ==  "Algeria")
+algeria_economy %>% 
+  autoplot(Exports) +
+  labs(y = "% of GDP", title = "Exports: Algeria")
+
+fit_algeria <- algeria_economy %>% 
+  model(ETS(Exports ~ error("A") + trend("N") + season("N") ))
+
+fc <- fit_algeria %>% 
+  forecast(h=5)
+
+#not that great but OK
+fc %>% 
+  autoplot(algeria_economy) +
+  geom_line(aes(y= .fitted), col ="red",
+            data = augment(fit_algeria)) +
+  labs(y="% GDP", title = "Exports: Algeria") +
+  guides(colour = FALSE)
+
+report(fit_algeria)
+
+```
+### Methods with trend
+
+`model()` calls this `ETS(A,A,N)`
+
+The linear trend method has a Forecast equation, a Level equation and a Trend equation
+*   Forecast at h = level + h*trend
+*   Level is the same as for SES but adds the level to the second part
+*   Trend is a two-per weighted avg of trends and represents the change in level
+*   The smoothing parameter for the level equation is $0 \leq \alpha \leq 1$
+*   The smoothing parameter for the trend equation is $0 \leq \beta^* \leq 1$
+
+It seems that the `ETS(Error, Trend, Season)` call sets "A" as an activator
+
 ```{r}
 
+fit_aus <- global_economy %>% 
+  filter(Country == "Australia") %>% 
+  mutate(Pop = Population/1e6) %>% 
+  model(
+    AAN = ETS(Pop ~ error("A") + trend("A") + season("N") ))
 
+fc <-fit_aus %>%  forecast(h = 10)
+
+#high alpha means that level equation is short-sighted
+#low-range beta means the trend gives a large emphasis on past-step trend
+report(fit_aus)
+
+#sanity checks
+glimpse(fc)
+glimpse(augment(fit_aus))
+tail(augment(fit_aus))
+tail(fc)
+
+```
+
+`model()` calls this `ETS(A,Ad,N)`
+
+This method (Holt's linear trend) can overstate the trend component in forecasting
+A recent more popular method is the Damped trend method. It introduces a dampening parameter $\phi$ which is bound by practitioners between $0.8 \leq \phi \leq 0.98$
+The method introduces the parameter in all three equations, dampening $b_{t-1}$
+
+```{r}
+#"Ad" doesnt let you specify phi less than 0.7
+aus_fits <- global_economy %>% 
+  filter(Country == "Australia") %>% 
+  mutate(Pop = Population/1e6) %>%  
+  model(
+    ANN = ETS(Pop ~ error("A") + trend("N") + season("N")),
+    AAN = ETS(Pop ~ error("A") + trend("A") + season("N")),
+    AAdN_90 = ETS(Pop ~ error("A") + trend("Ad", phi = 0.9) + season("N")),
+    AAdN_98 = ETS(Pop ~ error("A") + trend("Ad", phi = 0.98) + season("N")),
+    AAdN_70 = ETS(Pop ~ error("A") + trend("Ad", phi = 0.8) + season("N")) )
+
+report(aus_fits)
+
+fc <- aus_fits %>% forecast(h=15)
+
+aus_economy <- global_economy %>% 
+  filter(Country == "Australia") %>% 
+  mutate(Pop = Population/1e6)
+
+fc %>% 
+  autoplot(aus_economy)
+
+
+```
+
+```{r}
+www_usage <- as_tsibble(WWWusage)
+
+www_usage %>% 
+  model(
+    AAdN = ETS(value ~ error("A") + trend("Ad") + season("N")) ) %>% 
+  forecast(h=10) %>% 
+  autoplot(www_usage) +
+  labs(x="Minute", y="Number of users",
+       title = "Internet usage per minute")
+
+```
+
+### Methods with seasonality
+
+`model()` calls this `ETS(A,A,A)`
+
+Building up on the Holt trend method, the Holt-Winters additive method adds the last component $s_t$, which, as before, comes with a smoothing parameter (this time $\gamma$). A few notes:
+*   Recall quarterly seasons means m = 4 and yearly means m = 12
+*   The trend equation is fixed. The level equation uses seasonally adjusted observations
+*   The seasonality equation is a weighted average of the current seasonal index with the index for same season last year
+*   $s_t = \gamma^*(y_t - l_t) + (1-\gamma^*)s_{t-m}$
+
+`model()` calls this `ETS(M,A,M)`
+
+Similarly, the Holt-Winters multiplicative method multiplies the seasonal component with the trend and error components
+*   Forecast at h = (level + h*trend) X seasonal
+
+We can also dampen across both Holt-Winters seasonal methods
+
+```{r}
+aus_holidays <- tourism %>%
+  filter(Purpose == "Holiday") %>%
+  summarise(Trips = sum(Trips)/1e3)
+fit <- aus_holidays %>%
+  model(
+    additive = ETS(Trips ~ error("A") + trend("A") + 
+                                                season("A")),
+    multiplicative = ETS(Trips ~ error("M") + trend("A") + 
+                                                season("M"))
+  )
+
+fc <- fit %>% forecast(h = 12) #12 quarters
+fc %>%
+  autoplot(aus_holidays, level = NULL) +
+  labs(title="Australian domestic tourism",
+       y="Overnight trips (millions)") +
+  guides(colour = guide_legend(title = "Forecast"))
 ```
 
