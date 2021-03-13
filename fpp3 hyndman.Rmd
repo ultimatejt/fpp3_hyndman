@@ -1290,7 +1290,10 @@ aus_economy <- global_economy %>%
   mutate(Pop = Population/1e6)
 
 fc %>% 
-  autoplot(aus_economy)
+  autoplot(aus_economy) + 
+  guides(colour = guide_legend(title = "Forecast"))
+
+autoplot()
 
 
 ```
@@ -1329,19 +1332,122 @@ We can also dampen across both Holt-Winters seasonal methods
 aus_holidays <- tourism %>%
   filter(Purpose == "Holiday") %>%
   summarise(Trips = sum(Trips)/1e3)
+
+is_tsibble(aus_holidays)
+
 fit <- aus_holidays %>%
   model(
-    additive = ETS(Trips ~ error("A") + trend("A") + 
-                                                season("A")),
-    multiplicative = ETS(Trips ~ error("M") + trend("A") + 
-                                                season("M"))
+    AAA = ETS(Trips ~ error("A") + trend("A") + season("A")),
+    MAM = ETS(Trips ~ error("M") + trend("A") + season("M"))
   )
+
+str(fit)
 
 fc <- fit %>% forecast(h = 12) #12 quarters
 fc %>%
-  autoplot(aus_holidays, level = NULL) +
+  autoplot(aus_holidays) +
   labs(title="Australian domestic tourism",
        y="Overnight trips (millions)") +
   guides(colour = guide_legend(title = "Forecast"))
+
+report(fit)
+
+a <- NULL
+b <- ETS(ETS(Trips ~ error("A") + trend("A") + season("A")))
+c <- NULL
+is_null(a)+is_null(b)+is_null(c)
+
+list(ETS(Trips ~ error("A") + trend("A") + season("A")), ETS(Trips ~ error("A") + trend("A") + season("A")))[1]
+
+l <- list(a, b ,c)
+is_null(l[[1]])+is_null(l[[2]])+is_null(l[[3]])
+
+for (i in range(1:3))
+  sum <- sum(is_null(l[i]));
+  sum;
+
+sum(is_null(l[[]]))
+
+
+list("AAA", "NAN", "NAA")
+
+require(memisc)
+
+forPipe <- function(data, h=12, report = F, names = NULL, models = NULL, nmodels=1) {
+  nulls <- is_null(models[[1]])+is_null(models[[2]])+is_null(models[[3]])
+  
+  if(is_tsibble(data)==T && is_list(names)==T && is_list(models)==T) {
+    if(nulls==3) 
+      # no valid model
+        fit <- NULL
+      # one valid models
+    else
+      if(nulls==2)  
+          fit <- data %>% model(names[nmodels] = models[nmodels])
+        # two valid models
+      if(nulls==1)   
+          fit <- data %>% model(names[nmodels] = models[nmodels], 
+                                        names[nmodels-1] = models[nmodels-1])
+        # three valid models
+      if(nulls==0)  
+          fit <- data %>% model(names[nmodels] = models[nmodels], 
+                                        names[nmodels-1] = models[nmodels-1],
+                                        names[nmodels-2] = models[nmodels-2])
+      fc <- fit %>% forecast(h=h)
+      if(report==T)
+        report(fit)
+  
+      fc %>% 
+        autoplot(data) 
+        
+  } else {
+    fit <- NULL
+  }
+}
+
+forPipe <- function(data, h=12, report = F, models = NULL, nmodels=1) {
+  nulls <- is_null(models[[1]])+is_null(models[[2]])+is_null(models[[3]])
+  
+  if(is_tsibble(data)==T && is_list(models)==T) {
+    if(nulls==3) 
+      # no valid model
+        fit <- NULL
+      # one valid models
+    else
+      if(nulls==2)  
+          fit <- data %>% model(m1=models[nmodels])
+        # two valid models
+      if(nulls==1)   
+          fit <- data %>% model(m1=models[nmodels], 
+                                m2=models[nmodels-1])
+        # three valid models
+      if(nulls==0)  
+          fit <- data %>% model(m1=models[nmodels], 
+                                m2=models[nmodels-1],
+                                m3=models[nmodels-2])
+      fc <- fit %>% forecast(h=h)
+      if(report==T)
+        report(fit)
+  
+      p <- fc %>% 
+        autoplot(data) 
+      p
+        
+  } else {
+    fit <- NULL
+  }
+}
+
+
+
+myNames <- list("ANN", "AAA", "MAM")
+myModels <- list(ETS(Trips ~ error("A") + trend("N") + season("N")),
+                 ETS(Trips ~ error("A") + trend("A") + season("A")),
+                 ETS(Trips ~ error("M") + trend("A") + season("M")))
+
+fp <- forPipe(aus_holidays, 12, T, myModels, nmodels = 3)
+
+fp
+
 ```
 
